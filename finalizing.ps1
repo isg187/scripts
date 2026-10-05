@@ -2,6 +2,7 @@
 .SYNOPSIS
     Prepares the image for Sysprep. Stops third-party services and
     removes Docker Appx state that blocks generalize.
+    Keeps AVD and FSLogix services Automatic.
 
 .EXAMPLE
     .\finalizing.ps1
@@ -56,7 +57,14 @@ $keepService = @(
     'TokenBroker', 'WpnService', 'gpsvc', 'seclogon', 'ShellHWDetection',
     'SysMain', 'WSearch', 'Spooler', 'TermService', 'UmRdpService',
     'SessionEnv', 'WindowsAzureGuestAgent', 'WaAppAgent', 'RdAgent',
-    'WindowsAzureTelemetryService', 'GCArcService', 'HybridInstanceMetadataService'
+    'WindowsAzureTelemetryService', 'GCArcService', 'HybridInstanceMetadataService',
+    'frxsvc', 'frxccds', 'frxdrv', 'frxdrvvt'
+)
+
+$automaticService = @(
+    'frxsvc',
+    'RdAgent',
+    'WindowsAzureGuestAgent'
 )
 
 $keepProcess = @(
@@ -65,7 +73,8 @@ $keepProcess = @(
     'SecurityHealthService', 'SearchHost', 'RuntimeBroker', 'sihost',
     'taskhostw', 'conhost', 'powershell', 'pwsh', 'WmiPrvSE', 'LogonUI',
     'fontdrvhost', 'dllhost', 'smartscreen', 'WindowsAzureGuestAgent',
-    'WaAppAgent', 'WindowsAzureNetAgent', 'RdAgent', 'packer'
+    'WaAppAgent', 'WindowsAzureNetAgent', 'RdAgent', 'packer',
+    'frxsvc', 'frxccds'
 )
 
 function Test-KeepName {
@@ -152,6 +161,17 @@ try {
     foreach ($proc in $procs) {
         Write-Log ('Stopping process {0}' -f $proc.Name)
         Stop-Process -Id $proc.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+
+    Write-Log 'Setting AVD and FSLogix services to Automatic'
+    foreach ($name in $automaticService) {
+        $svc = Get-Service -Name $name -ErrorAction SilentlyContinue
+        if (-not $svc) {
+            Write-Log ('Service not present: {0}' -f $name) -Level WARN
+            continue
+        }
+        Set-Service -Name $name -StartupType Automatic -ErrorAction SilentlyContinue
+        Write-Log ('Set {0} to Automatic' -f $name) -Level SUCCESS
     }
 
     Write-Log 'Stop pass finished' -Level SUCCESS
